@@ -1,0 +1,45 @@
+/* App.css - Configurações globais para a aplicação da cafeteria */
+
+.App {
+  min-height: 100vh;
+  font-family: 'Courier New', monospace;
+}
+
+/* Reset global adicional para nossa aplicação */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #0a0a0a;
+  color: #ffffff;
+  overflow-x: hidden;
+  font-family: 'Courier New', monospace;
+}
+
+#root {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  text-align: left;
+}
+
+/* Scrollbar personalizada para o tema retrô */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00f5ff;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ff006e;
+}
