@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { authService, apiUtils } from '../services/api';
 import './Login.css';
 
-const Login = ({ onNavigateToHome }) => {
+const Login = ({ onNavigateToHome, onNavigateToMenu }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
@@ -13,6 +13,27 @@ const Login = ({ onNavigateToHome }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState('');
+  const [apiStatus, setApiStatus] = useState(null); // null, 'checking', 'online', 'offline'
+
+  // Verificar status da API ao montar o componente
+  useEffect(() => {
+    const checkApiStatus = async () => {
+      setApiStatus('checking');
+      try {
+        const isOnline = await apiUtils.checkApiHealth();
+        setApiStatus(isOnline ? 'online' : 'offline');
+        
+        if (!isOnline) {
+          setMessage('⚠️ Servidor offline. Algumas funcionalidades podem não estar disponíveis.');
+        }
+      } catch (error) {
+        setApiStatus('offline');
+        setMessage('⚠️ Não foi possível conectar ao servidor.');
+      }
+    };
+
+    checkApiStatus();
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -72,6 +93,12 @@ const Login = ({ onNavigateToHome }) => {
       return;
     }
 
+    // Verificar se a API está online antes de tentar fazer login/cadastro
+    if (apiStatus === 'offline') {
+      setMessage('❌ Servidor indisponível. Tente novamente mais tarde.');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
 
@@ -80,31 +107,91 @@ const Login = ({ onNavigateToHome }) => {
       
       if (isLogin) {
         // Fazer login
+        console.log('Tentando fazer login com:', { email: formData.email });
         response = await authService.login({
           email: formData.email,
           senha: formData.senha
         });
+        
+        console.log('Resposta do login:', response);
+        
+        // Verificar tipo de usuário após login
+        if (response.access_token) {
+          try {
+            const userTypeInfo = await authService.getUserType();
+            console.log('Tipo de usuário:', userTypeInfo);
+            
+            // Salvar informações adicionais do usuário
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const updatedUser = { ...currentUser, ...userTypeInfo };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            
+          } catch (userTypeError) {
+            console.warn('Erro ao obter tipo de usuário:', userTypeError);
+            // Não falhar o login por conta disso
+          }
+        }
+        
       } else {
         // Fazer cadastro
+        console.log('Tentando fazer cadastro com:', { 
+          nome: formData.nome, 
+          email: formData.email,
+          tipo_usuario: 'cliente' 
+        });
         response = await authService.cadastrar({
           nome: formData.nome,
           email: formData.email,
-          senha: formData.senha
+          senha: formData.senha,
+          tipo_usuario: 'cliente' // Por padrão, novos registros são clientes
         });
+        
+        console.log('Resposta do cadastro:', response);
       }
       
-      setMessage(isLogin ? 'Login realizado com sucesso!' : 'Cadastro realizado com sucesso!');
+      // Atualizar status da API para online se a requisição foi bem-sucedida
+      if (apiStatus !== 'online') {
+        setApiStatus('online');
+      }
+      
+      setMessage(isLogin ? '✅ Login realizado com sucesso!' : '✅ Cadastro realizado com sucesso!');
+      
+      // Limpar formulário após sucesso
+      setFormData({
+        email: '',
+        senha: '',
+        nome: '',
+        confirmarSenha: ''
+      });
       
       // Redirecionar para o menu após sucesso
       setTimeout(() => {
         console.log('Redirecionando para o menu...');
-        // window.location.href = '/menu'; // Implementar quando tiver roteamento
+        // Verificar se há função de navegação para menu
+        if (onNavigateToMenu) {
+          onNavigateToMenu();
+        } else if (onNavigateToHome) {
+          // Fallback para home se não tiver navegação direta para menu
+          console.log('Navegação para menu não disponível, indo para home');
+          onNavigateToHome();
+        } else {
+          // Último fallback para redirecionamento direto
+          console.log('Nenhuma função de navegação disponível, usando window.location');
+          window.location.href = '/menu';
+        }
       }, 1500);
 
     } catch (error) {
       console.error('Erro:', error);
-      const errorMessage = apiUtils.handleApiError(error);
-      setMessage(errorMessage);
+      
+      // Verificar se é erro de conectividade
+      if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+        setApiStatus('offline');
+        setMessage('❌ Erro de conexão. Verifique sua internet e tente novamente.');
+      } else {
+        const errorMessage = apiUtils.handleApiError(error);
+        setMessage(`❌ ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -170,6 +257,15 @@ const Login = ({ onNavigateToHome }) => {
                 : 'Junte-se à revolução do café e crie sua conta!'
               }
             </p>
+            
+            {/* Status da API */}
+            {apiStatus && (
+              <div className={`api-status ${apiStatus}`}>
+                {apiStatus === 'checking' && '🔄 Verificando servidor...'}
+                {apiStatus === 'online' && '🟢 Servidor online'}
+                {apiStatus === 'offline' && '🔴 Servidor offline'}
+              </div>
+            )}
           </div>
 
           {/* Toggle Buttons de Login e Cadastro */}
@@ -304,7 +400,7 @@ const Login = ({ onNavigateToHome }) => {
           <h3 className="info-title">BENEFÍCIOS</h3>
           <div className="benefits-list">
             <div className="benefit-item">
-              <span className="benefit-icon">🤖</span>
+              <span className="benefit-icon">☕</span>
               <span className="benefit-text">Certificado pelo PEAGA</span>
             </div>
             <div className="benefit-item">

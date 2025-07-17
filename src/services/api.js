@@ -50,22 +50,23 @@ const apiRequest = async (endpoint, options = {}) => {
 
 export const authService = {
   /**
-   * Cadastrar novo cliente
-   * POST /api/clientes/cadastro
+   * Registrar novo usuário (cliente ou staff)
+   * POST /auth/register
    */
   async cadastrar(userData) {
-    const response = await apiRequest('/api/clientes/cadastro', {
+    const response = await apiRequest('/auth/register', {
       method: 'POST',
       body: JSON.stringify({
         nome: userData.nome,
         email: userData.email,
-        senha: userData.senha
+        senha: userData.senha,
+        tipo_usuario: userData.tipo_usuario || 'cliente' // Default para cliente
       }),
     });
 
     // Salvar token se retornado
-    if (response.token) {
-      localStorage.setItem('authToken', response.token);
+    if (response.access_token) {
+      localStorage.setItem('authToken', response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));
     }
 
@@ -73,21 +74,21 @@ export const authService = {
   },
 
   /**
-   * Fazer login
-   * POST /api/clientes/login
+   * Fazer login universal
+   * POST /auth/login
    */
   async login(credentials) {
-    const response = await apiRequest('/api/clientes/login', {
+    const response = await apiRequest('/auth/login', {
       method: 'POST',
       body: JSON.stringify({
-        email: credentials.email,
+        identifier: credentials.email,
         senha: credentials.senha
       }),
     });
 
     // Salvar token e dados do usuário
-    if (response.token) {
-      localStorage.setItem('authToken', response.token);
+    if (response.access_token) {
+      localStorage.setItem('authToken', response.access_token);
       localStorage.setItem('user', JSON.stringify(response.user));
     }
 
@@ -95,12 +96,32 @@ export const authService = {
   },
 
   /**
-   * Obter dados do usuário logado
-   * GET /api/clientes/me
+   * Obter informações do usuário logado
+   * GET /auth/me
    */
   async getProfile() {
-    return await apiRequest('/api/clientes/me', {
+    return await apiRequest('/auth/me', {
       method: 'GET',
+    });
+  },
+
+  /**
+   * Verificar tipo de usuário
+   * GET /auth/user-type
+   */
+  async getUserType() {
+    return await apiRequest('/auth/user-type', {
+      method: 'GET',
+    });
+  },
+
+  /**
+   * Renovar token JWT
+   * POST /auth/refresh
+   */
+  async refreshToken() {
+    return await apiRequest('/auth/refresh', {
+      method: 'POST',
     });
   },
 
@@ -126,6 +147,32 @@ export const authService = {
   getCurrentUser() {
     const userString = localStorage.getItem('user');
     return userString ? JSON.parse(userString) : null;
+  },
+
+  /**
+   * Verificar se o usuário é staff
+   */
+  isStaff() {
+    const user = this.getCurrentUser();
+    return user && (user.tipo_usuario === 'staff' || user.is_staff === true);
+  },
+
+  /**
+   * Verificar se o usuário é cliente
+   */
+  isClient() {
+    const user = this.getCurrentUser();
+    return user && (user.tipo_usuario === 'cliente' || user.is_client === true);
+  },
+
+  /**
+   * Atualizar dados do usuário no localStorage
+   */
+  updateUserData(userData) {
+    const currentUser = this.getCurrentUser() || {};
+    const updatedUser = { ...currentUser, ...userData };
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    return updatedUser;
   }
 };
 
@@ -136,50 +183,60 @@ export const authService = {
 export const productService = {
   /**
    * Listar todas as bebidas
-   * GET /products/
+   * GET /bebidas/
    */
   async getBebidas() {
-    return await apiRequest('/products/', {
+    return await apiRequest('/bebidas/', {
+      method: 'GET',
+    });
+  },
+
+  /**
+   * Obter menu completo com bebidas e tipos
+   * GET /bebidas/menu
+   */
+  async getBebidasMenu() {
+    return await apiRequest('/bebidas/menu', {
       method: 'GET',
     });
   },
 
   /**
    * Obter detalhes de uma bebida específica
-   * GET /products/{id}
+   * GET /bebidas/{id}
    */
   async getBebidaById(id) {
-    return await apiRequest(`/products/${id}`, {
+    return await apiRequest(`/bebidas/${id}`, {
       method: 'GET',
     });
   },
 
   /**
    * Listar bebidas por tipo
-   * GET /products/types/{tipo}
+   * GET /bebidas/types/{tipo}
    */
   async getBebidasByType(tipo) {
-    return await apiRequest(`/products/types/${tipo}`, {
+    return await apiRequest(`/bebidas/types/${tipo}`, {
       method: 'GET',
     });
   },
 
   /**
-   * Obter personalizações disponíveis para uma bebida
-   * GET /products/{id}/personalizations
+   * Obter todas as personalizações disponíveis
+   * GET /personalizacoes
    */
-  async getPersonalizacoes(bebidaId) {
-    return await apiRequest(`/products/${bebidaId}/personalizations`, {
+  async getPersonalizacoes() {
+    return await apiRequest('/personalizacoes', {
       method: 'GET',
     });
   },
 
   /**
    * Obter tipos de bebidas disponíveis
-   * GET /api/produtos/tipos-bebida
+   * GET /bebidas/tipos/disponiveis
    */
   async getTiposBebida() {
-    return await apiRequest('/api/produtos/tipos-bebida', {
+    return await apiRequest('/bebidas/tipos/disponiveis', {
       method: 'GET',
     });
   }
@@ -192,57 +249,60 @@ export const productService = {
 export const cartService = {
   /**
    * Obter itens do carrinho
-   * GET /cart/
+   * GET /carrinho
    */
   async getCart() {
-    return await apiRequest('/cart/', {
+    return await apiRequest('/carrinho', {
       method: 'GET',
     });
   },
 
   /**
    * Adicionar item ao carrinho
-   * POST /cart/add
+   * POST /carrinho
    */
   async addToCart(item) {
-    return await apiRequest('/cart/add', {
+    return await apiRequest('/carrinho', {
       method: 'POST',
       body: JSON.stringify({
-        bebida_id: item.bebidaId,
-        quantidade: item.quantidade,
-        personalizacoes: item.personalizacoes || []
+        bebida_id: item.bebida_id,
+        quantidade: item.quantidade || 1,
+        personalizacoes: item.personalizacoes || [],
+        observacoes: item.observacoes || ''
       }),
     });
   },
 
   /**
-   * Atualizar quantidade de um item
-   * PUT /cart/item/{id}
+   * Obter total do carrinho
+   * GET /carrinho/total
    */
-  async updateCartItem(itemId, quantidade) {
-    return await apiRequest(`/cart/item/${itemId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ quantidade }),
+  async getCartTotal() {
+    return await apiRequest('/carrinho/total', {
+      method: 'GET',
     });
   },
 
   /**
    * Remover item do carrinho
-   * DELETE /cart/item/{id}
+   * DELETE /carrinho/{item_id}
    */
   async removeFromCart(itemId) {
-    return await apiRequest(`/cart/item/${itemId}`, {
+    return await apiRequest(`/carrinho/${itemId}`, {
       method: 'DELETE',
     });
   },
 
   /**
    * Limpar carrinho
-   * DELETE /cart/clear
+   * DELETE /carrinho
    */
-  async clearCart() {
-    return await apiRequest('/cart/clear', {
+  async clearCart(clienteId) {
+    return await apiRequest('/carrinho', {
       method: 'DELETE',
+      body: JSON.stringify({
+        cliente_id: clienteId
+      }),
     });
   }
 };
@@ -257,31 +317,47 @@ export const orderService = {
    * POST /orders/
    */
   async createOrder(orderData) {
-    return await apiRequest('/orders/', {
+    return await apiRequest('/pedidos', {
       method: 'POST',
       body: JSON.stringify({
         metodo_pagamento: orderData.metodoPagamento,
+        tipo_desconto: orderData.tipoDesconto || 'nenhum',
         observacoes: orderData.observacoes || ''
       }),
     });
   },
 
   /**
-   * Obter histórico de pedidos
-   * GET /orders/
+   * Obter histórico de pedidos do usuário logado
+   * GET /pedidos
    */
-  async getOrders() {
-    return await apiRequest('/orders/', {
+  async getOrders(filters = {}) {
+    const params = new URLSearchParams();
+    
+    if (filters.status) {
+      params.append('status', filters.status);
+    }
+    if (filters.skip !== undefined) {
+      params.append('skip', filters.skip);
+    }
+    if (filters.limit !== undefined) {
+      params.append('limit', filters.limit);
+    }
+
+    const queryString = params.toString();
+    const endpoint = queryString ? `/pedidos?${queryString}` : '/pedidos';
+    
+    return await apiRequest(endpoint, {
       method: 'GET',
     });
   },
 
   /**
    * Obter detalhes de um pedido específico
-   * GET /orders/{id}
+   * GET /pedidos/{id}
    */
   async getOrderById(id) {
-    return await apiRequest(`/orders/${id}`, {
+    return await apiRequest(`/pedidos/${id}`, {
       method: 'GET',
     });
   },
@@ -357,23 +433,43 @@ export const apiUtils = {
    * Tratar erros de API de forma padronizada
    */
   handleApiError(error) {
-    if (error.message.includes('401')) {
+    if (error.message.includes('401') || error.message.includes('Unauthorized')) {
       // Token expirado ou inválido
       authService.logout();
-      window.location.href = '/login';
       return 'Sessão expirada. Faça login novamente.';
     }
     
-    if (error.message.includes('403')) {
+    if (error.message.includes('403') || error.message.includes('Forbidden')) {
       return 'Acesso negado. Você não tem permissão para esta ação.';
     }
     
-    if (error.message.includes('404')) {
+    if (error.message.includes('404') || error.message.includes('Not Found')) {
       return 'Recurso não encontrado.';
     }
     
-    if (error.message.includes('500')) {
+    if (error.message.includes('422') || error.message.includes('Unprocessable Entity')) {
+      return 'Dados inválidos. Verifique as informações e tente novamente.';
+    }
+    
+    if (error.message.includes('409') || error.message.includes('Conflict')) {
+      return 'Este email já está em uso. Tente fazer login ou use outro email.';
+    }
+    
+    if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
       return 'Erro interno do servidor. Tente novamente mais tarde.';
+    }
+    
+    // Erros específicos de validação
+    if (error.message.toLowerCase().includes('email')) {
+      return 'Email inválido ou já cadastrado.';
+    }
+    
+    if (error.message.toLowerCase().includes('senha') || error.message.toLowerCase().includes('password')) {
+      return 'Senha inválida ou muito fraca.';
+    }
+    
+    if (error.message.toLowerCase().includes('credenciais') || error.message.toLowerCase().includes('credentials')) {
+      return 'Email ou senha incorretos.';
     }
     
     return error.message || 'Erro desconhecido. Tente novamente.';
@@ -384,10 +480,24 @@ export const apiUtils = {
    */
   async checkApiHealth() {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
+      // Tentar primeiro o endpoint de health padrão
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        method: 'GET',
+        timeout: 5000
+      });
       return response.ok;
     } catch (error) {
-      return false;
+      try {
+        // Fallback: tentar endpoint raiz
+        const response = await fetch(`${API_BASE_URL}/`, {
+          method: 'GET', 
+          timeout: 5000
+        });
+        return response.ok;
+      } catch (fallbackError) {
+        console.warn('API indisponível:', fallbackError);
+        return false;
+      }
     }
   }
 };

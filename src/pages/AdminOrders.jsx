@@ -1,7 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import './AdminOrders.css';
+import { useAuth } from '../hooks/useAuth';
+import { authService } from '../services/api';
 
-const AdminOrders = ({ onNavigateToHome }) => {
+const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
+  const { isLoggedIn, loading: authLoading } = useAuth();
+
+  // Verificação de autenticação e permissão
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isLoggedIn) {
+        // Redirecionar para login se não estiver autenticado
+        if (onNavigateToLogin) {
+          onNavigateToLogin();
+        } else if (onNavigateToHome) {
+          onNavigateToHome();
+        }
+      } else if (!authService.isStaff()) {
+        // Redirecionar para home se não for staff/admin
+        if (onNavigateToHome) {
+          onNavigateToHome();
+        }
+      }
+    }
+  }, [isLoggedIn, authLoading, onNavigateToLogin, onNavigateToHome]);
+
   // Mock data - substituir por API no futuro
   // Função para obter pedidos (mock, substituir por API futuramente)
   const getInitialOrders = () => ([

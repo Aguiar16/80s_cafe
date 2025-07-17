@@ -136,6 +136,97 @@ body {
   transform: translateY(-2px);
 }
 
+/* User Menu Styles */
+.user-menu {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.user-btn {
+  background: linear-gradient(45deg, var(--neon-purple), var(--neon-pink));
+  border: 2px solid var(--neon-pink);
+  color: white;
+  padding: 8px 12px;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+}
+
+.user-btn:hover {
+  background: linear-gradient(45deg, var(--neon-pink), var(--neon-purple));
+  box-shadow: 0 0 20px var(--neon-pink);
+  transform: translateY(-2px);
+}
+
+.user-icon {
+  font-size: 1.1rem;
+}
+
+.user-name {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+.logout-btn {
+  background: transparent;
+  border: 2px solid #ff4444;
+  color: #ff4444;
+  padding: 8px 12px;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+}
+
+.logout-btn:hover {
+  background: #ff4444;
+  color: white;
+  box-shadow: 0 0 20px #ff4444;
+  transform: translateY(-2px);
+}
+
+.logout-icon {
+  font-size: 1rem;
+}
+
+/* Auth loading indicator */
+.auth-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  color: var(--neon-cyan);
+  font-size: 1.2rem;
+}
+
+/* Staff badge */
+.staff-badge {
+  background: linear-gradient(45deg, #ffd700, #ff8c00);
+  color: #000;
+  font-size: 0.6rem;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
 /* ======================================
    HERO SECTION
    ====================================== */
@@ -753,6 +844,24 @@ body {
   .nav-btn {
     padding: 6px 12px;
     font-size: 0.8rem;
+  }
+
+  /* User menu responsivo */
+  .user-menu {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .user-btn, .logout-btn {
+    padding: 8px 10px;
+    font-size: 0.7rem;
+    justify-content: center;
+  }
+
+  .user-name {
+    max-width: 60px;
+    font-size: 0.7rem;
   }
   
   .hero {

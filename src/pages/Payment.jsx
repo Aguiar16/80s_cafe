@@ -1,9 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Payment.css';
+import { useAuth } from '../hooks/useAuth';
+import { orderService } from '../services/api';
 
-const Payment = ({ orderData, onNavigateToHome, onNavigateBack }) => {
+const Payment = ({ orderData, onNavigateToHome, onNavigateBack, onNavigateToLogin }) => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { isLoggedIn, loading: authLoading } = useAuth();
+
+
+  const currentOrder = orderData;
+
+  // Verificação de autenticação
+  useEffect(() => {
+    if (!authLoading && !isLoggedIn) {
+      // Redirecionar para login se não estiver autenticado
+      if (onNavigateToLogin) {
+        onNavigateToLogin();
+      } else if (onNavigateToHome) {
+        onNavigateToHome();
+      }
+    }
+  }, [isLoggedIn, authLoading, onNavigateToLogin, onNavigateToHome]);
 
   // Tipos de pagamento com descontos
   const paymentMethods = [
@@ -33,21 +51,6 @@ const Payment = ({ orderData, onNavigateToHome, onNavigateBack }) => {
     }
   ];
 
-  // Dados padrão do pedido caso não seja fornecido
-  const defaultOrder = {
-    drink: {
-      name: 'DeLorean Express',
-      icon: '☕'
-    },
-    customizations: [
-      { name: 'Leite de Amêndoa', price: 2.00 },
-      { name: 'Canela', price: 0.50 }
-    ],
-    totalPrice: 14.50
-  };
-
-  const currentOrder = orderData || defaultOrder;
-
   // Calcular preço com desconto
   const calculateDiscountedPrice = (basePrice, discount) => {
     return basePrice * (1 - discount);
@@ -69,20 +72,53 @@ const Payment = ({ orderData, onNavigateToHome, onNavigateBack }) => {
 
     setIsProcessing(true);
 
-    // Simular processamento do pagamento
-    setTimeout(() => {
-      const finalPrice = calculateDiscountedPrice(currentOrder.totalPrice, selectedPaymentMethod.discount);
-      const savings = calculateSavings(currentOrder.totalPrice, selectedPaymentMethod.discount);
-      
-      alert(`Pagamento realizado com sucesso!\n\nPedido: ${currentOrder.drink.name}\nMétodo: ${selectedPaymentMethod.name}\nValor original: R$ ${currentOrder.totalPrice.toFixed(2)}\nDesconto: R$ ${savings.toFixed(2)}\nValor final: R$ ${finalPrice.toFixed(2)}\n\nObrigado pela preferência!`);
-      
+    // Mapear método de pagamento para o formato da API
+    let metodoPagamento;
+    let tipoDesconto;
+
+    switch (selectedPaymentMethod.id) {
+      case 'pix':
+        metodoPagamento = 'PIX';
+        tipoDesconto = 'PIX';
+        break;
+      case 'fidelidade':
+        metodoPagamento = 'FIDELIDADE';
+        tipoDesconto = 'FIDELIDADE';
+        break;
+      case 'debito':
+        metodoPagamento = 'CARTÃO';
+        tipoDesconto = 'NENHUM';
+        break;
+      default:
+        metodoPagamento = 'CARTÃO';
+        tipoDesconto = 'NENHUM';
+    }
+
+    // Monta corpo do pedido
+    const orderBody = {
+      metodo_pagamento: metodoPagamento,
+      tipo_desconto: tipoDesconto,
+      observacoes: currentOrder.items && currentOrder.items.length > 0
+        ? currentOrder.items.map(i => i.observacoes).filter(Boolean).join('; ')
+        : ''
+    };
+
+    try {
+      await orderService.createOrder(orderBody);
+      // Simular processamento do pagamento
+      setTimeout(() => {
+        const finalPrice = calculateDiscountedPrice(currentOrder.totalPrice, selectedPaymentMethod.discount);
+        const savings = calculateSavings(currentOrder.totalPrice, selectedPaymentMethod.discount);
+        alert(`Pagamento realizado com sucesso!\n\nMétodo: ${selectedPaymentMethod.name}\nValor original: R$ ${currentOrder.totalPrice.toFixed(2)}\nDesconto: R$ ${savings.toFixed(2)}\nValor final: R$ ${finalPrice.toFixed(2)}\n\nObrigado pela preferência!`);
+        setIsProcessing(false);
+        if (onNavigateToHome) {
+          onNavigateToHome();
+        }
+      }, 2000);
+    } catch (err) {
+      alert('Erro ao criar pedido: ' + (err.message || 'Tente novamente.'));
       setIsProcessing(false);
-      
-      // Voltar para home após pagamento
-      if (onNavigateToHome) {
-        onNavigateToHome();
-      }
-    }, 2000);
+    }
   };
 
   const handleBackToMenu = () => {
@@ -125,30 +161,46 @@ const Payment = ({ orderData, onNavigateToHome, onNavigateBack }) => {
               </h2>
               
               <div className="order-summary-card">
-                <div className="order-item">
-                  <div className="item-icon">{currentOrder.drink.icon}</div>
-                  <div className="item-details">
-                    <h3 className="item-name">{currentOrder.drink.name}</h3>
-                    
-                    {currentOrder.customizations && currentOrder.customizations.length > 0 && (
-                      <div className="item-customizations">
-                        <span className="customizations-label">Personalizações:</span>
-                        <div className="customizations-list">
-                          {currentOrder.customizations.map((customization, index) => (
-                            <span key={index} className="customization-tag">
-                              {customization.name}
-                              {customization.price > 0 && ` (+R$ ${customization.price.toFixed(2)})`}
-                            </span>
-                          ))}
+                {currentOrder.items && currentOrder.items.length > 0 ? (
+                  currentOrder.items.map((item, idx) => (
+                    <div key={idx} className="order-item">
+                      <div className="item-details">
+                        <h3 className="item-name">{item.bebida_nome || 'Bebida'}</h3>
+                        <span className="item-quantity">Qtd: {item.quantidade}</span>
+                        {item.personalizacoes && item.personalizacoes.length > 0 && (
+                          <div className="item-customizations">
+                            <span className="customizations-label">Personalizações:</span>
+                            <div className="customizations-list">
+                              {item.personalizacoes.map((c, i) => (
+                                <span key={i} className="customization-tag">
+                                  {c.nome}
+                                  {c.preco_adicional > 0 && ` (+R$ ${c.preco_adicional.toFixed(2)})`}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {item.observacoes && (
+                          <div className="item-observacoes">
+                            <span className="observacoes-label">Observações:</span>
+                            <span className="observacoes-text">{item.observacoes}</span>
+                          </div>
+                        )}
+                        <div className="item-price">
+                          <span className="price-label">Subtotal:</span>
+                          <span className="price-value">R$ {item.subtotal ? item.subtotal.toFixed(2) : '0.00'}</span>
                         </div>
                       </div>
-                    )}
-                    
-                    <div className="item-price">
-                      <span className="price-label">Subtotal:</span>
-                      <span className="price-value">R$ {currentOrder.totalPrice.toFixed(2)}</span>
                     </div>
+                  ))
+                ) : (
+                  <div className="order-item">
+                    <span>Nenhum item no pedido.</span>
                   </div>
+                )}
+                <div className="order-total">
+                  <span className="total-label">TOTAL:</span>
+                  <span className="total-value">R$ {currentOrder.totalPrice ? currentOrder.totalPrice.toFixed(2) : '0.00'}</span>
                 </div>
               </div>
             </section>

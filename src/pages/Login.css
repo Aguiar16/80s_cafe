@@ -219,7 +219,7 @@
   background: rgba(10, 10, 10, 0.9);
   border: 2px solid var(--neon-cyan);
   border-radius: 10px;
-  padding: 40px;
+  padding: 30px;
   width: 100%;
   max-width: 450px;
   position: relative;
@@ -273,6 +273,39 @@
   color: var(--text-secondary);
   line-height: 1.5;
   font-size: 1rem;
+}
+
+/* API Status Indicator */
+.api-status {
+  margin-top: 15px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+  border: 1px solid;
+  transition: all 0.3s ease;
+}
+
+.api-status.checking {
+  color: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+  background: rgba(0, 245, 255, 0.1);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.api-status.online {
+  color: #00ff88;
+  border-color: #00ff88;
+  background: rgba(0, 255, 136, 0.1);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+.api-status.offline {
+  color: #ff4444;
+  border-color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+  box-shadow: 0 0 10px rgba(255, 68, 68, 0.3);
 }
 
 /* ======================================
@@ -339,7 +372,7 @@
   background: rgba(0, 0, 0, 0.7);
   border: 2px solid var(--grid-color);
   border-radius: 5px;
-  padding: 15px;
+  padding: 10px;
   color: var(--text-primary);
   font-family: 'Courier New', monospace;
   font-size: 1rem;

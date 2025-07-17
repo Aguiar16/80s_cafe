@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import './Home.css';
 
 const Home = ({ onNavigateToLogin, onNavigateToMenu, onNavigateToOrders, onNavigateToAdmin, onNavigateToPayment }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const { user, isLoggedIn, loading, logout, isStaff } = useAuth();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -19,15 +21,26 @@ const Home = ({ onNavigateToLogin, onNavigateToMenu, onNavigateToOrders, onNavig
     }
   };
 
-  const handlePaymentClick = () => {
-    if (onNavigateToPayment) {
-      onNavigateToPayment();
+  const handleLoginClick = () => {
+    if (isLoggedIn) {
+      // Se já estiver logado, fazer logout
+      handleLogout();
+    } else {
+      // Se não estiver logado, ir para tela de login
+      if (onNavigateToLogin) {
+        onNavigateToLogin();
+      }
     }
   };
 
-  const handleLoginClick = () => {
-    if (onNavigateToLogin) {
-      onNavigateToLogin();
+  const handleLogout = () => {
+    logout();
+  };
+
+  const handleUserProfileClick = () => {
+    // Navegar para a página de menu (área do usuário)
+    if (onNavigateToMenu) {
+      onNavigateToMenu();
     }
   };
 
@@ -55,9 +68,30 @@ const Home = ({ onNavigateToLogin, onNavigateToMenu, onNavigateToOrders, onNavig
           <nav className="nav">
             <button className="nav-btn" onClick={scrollToMenu}>MENU</button>
             <button className="nav-btn" onClick={handleOrdersClick}>PEDIDOS</button>
-            <button className="nav-btn" onClick={handlePaymentClick}>PAGAMENTO</button>
             <button className="nav-btn" onClick={handleAdminClick}>ADMIN</button>
-            <button className="nav-btn" onClick={handleLoginClick}>LOGIN</button>
+            
+            {/* Botão de login/logout dinâmico */}
+            {loading ? (
+              <div className="auth-loading">
+                <span>⏳</span>
+              </div>
+            ) : isLoggedIn ? (
+              <div className="user-menu">
+                <button className="user-btn" onClick={handleUserProfileClick}>
+                  <span className="user-icon">👤</span>
+                  <span className="user-name">
+                    {user?.nome ? user.nome.split(' ')[0] : 'Usuário'}
+                  </span>
+                  {isStaff && <span className="staff-badge">STAFF</span>}
+                </button>
+                <button className="logout-btn" onClick={handleLogout}>
+                  <span className="logout-icon">🚪</span>
+                  SAIR
+                </button>
+              </div>
+            ) : (
+              <button className="nav-btn" onClick={handleLoginClick}>LOGIN</button>
+            )}
           </nav>
         </div>
       </header>
@@ -109,7 +143,7 @@ const Home = ({ onNavigateToLogin, onNavigateToMenu, onNavigateToOrders, onNavig
               <span className="btn-text">EXPLORAR MENU</span>
               <span className="btn-glow"></span>
             </button>
-            <button className="btn btn-secondary">
+            <button className="btn btn-secondary" onClick={handleOrdersClick}>
               <span className="btn-text">FAZER PEDIDO</span>
               <span className="btn-glow"></span>
             </button>
@@ -150,11 +184,10 @@ const Home = ({ onNavigateToLogin, onNavigateToMenu, onNavigateToOrders, onNavig
           
           <div className="features-grid">
             <div className="feature-card">
-              <div className="feature-icon">🤖</div>
-              <h3 className="feature-title">IA PERSONALIZADA</h3>
+              <div className="feature-icon">☕</div>
+              <h3 className="feature-title">Aprovado pelo PEAGA</h3>
               <p className="feature-description">
-                No futuro nosso sistema inteligente aprenderá suas preferências e sugerirá
-                combinações perfeitas para o seu paladar.
+                Testado e aprovado pelo nosso consultor PEAGA, especializado em café e em sistemas.
               </p>
               <div className="feature-highlight">TECNOLOGIA AVANÇADA</div>
             </div>
