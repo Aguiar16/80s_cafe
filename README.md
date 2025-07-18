@@ -35,10 +35,6 @@ Uma aplicação web futurística com tema retrô anos 80 para gerenciamento de p
 ## 📦 Instalação e Execução
 
 ```bash
-# Clonar repositório
-git clone [repo-url]
-cd pain_peko
-
 # Instalar dependências
 npm install
 
@@ -80,36 +76,6 @@ VITE_API_URL=http://localhost:8000
 - Mudanças de login/logout refletem em todas as abas abertas
 - Status da API atualizado em tempo real
 - Verificação automática de token expirado
-
-## 📚 Documentação
-
-- [`/src/docs/AUTHENTICATION.md`](src/docs/AUTHENTICATION.md) - Integração de autenticação
-- [`/src/docs/LOGIN_NAVIGATION_TESTS.md`](src/docs/LOGIN_NAVIGATION_TESTS.md) - Testes de navegação
-- [`/CHANGELOG_AUTH.md`](CHANGELOG_AUTH.md) - Log de mudanças
-
-## 🧪 Testes
-
-### Teste Manual
-```bash
-# Teste de login
-1. Registrar novo usuário
-2. Verificar redirecionamento para menu
-3. Verificar nome no header
-4. Fazer logout
-5. Verificar volta para botão LOGIN
-
-# Teste de sincronização
-1. Abrir em duas abas
-2. Login em uma aba
-3. Verificar atualização na outra
-```
-
-### Teste Automatizado
-```javascript
-// No console do navegador
-import { runAllTests } from './src/utils/auth-test';
-runAllTests();
-```
 
 ## 🎨 Tema Visual
 
