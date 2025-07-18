@@ -27,6 +27,18 @@ const apiRequest = async (endpoint, options = {}) => {
     
     // Verificar se a resposta é bem-sucedida
     if (!response.ok) {
+      // Se for erro 401 (Unauthorized), token inválido
+      if (response.status === 401) {
+        // Limpar dados de autenticação automaticamente
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        
+        // Dispathar evento customizado para notificar componentes sobre logout
+        window.dispatchEvent(new CustomEvent('auth-logout', { 
+          detail: { reason: 'token-invalid' } 
+        }));
+      }
+      
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `Erro ${response.status}: ${response.statusText}`);
     }
@@ -139,6 +151,29 @@ export const authService = {
    */
   isAuthenticated() {
     return !!localStorage.getItem('authToken');
+  },
+
+  /**
+   * Validar se o token atual é válido
+   */
+  async validateToken() {
+    try {
+      if (!this.isAuthenticated()) {
+        return false;
+      }
+      
+      // Tentar fazer uma requisição autenticada
+      await this.getProfile();
+      return true;
+    } catch (error) {
+      // Se der erro 401, token é inválido
+      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        this.logout();
+        return false;
+      }
+      // Para outros erros, assumir que o token é válido (pode ser problema de rede)
+      return true;
+    }
   },
 
   /**
@@ -366,8 +401,8 @@ export const orderService = {
    * DELETE /pedidos/{pedido_id}
    */
   async cancelOrder(pedidoId) {
-    return await apiRequest(`/pedidos/${pedidoId}`, {
-      method: 'DELETE',
+    return await apiRequest(`/pedidos/${pedidoId}/cancelar-state`, {
+      method: 'POST',
     });
   }
 };

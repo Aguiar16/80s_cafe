@@ -400,6 +400,42 @@
   font-weight: bold;
   color: var(--text-primary);
   margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-quantity {
+  color: var(--neon-cyan);
+  font-weight: bold;
+  min-width: 30px;
+}
+
+.item-name {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.item-price {
+  color: var(--neon-yellow);
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.loading-items {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+}
+
+.items-list {
+  margin-bottom: 15px;
+}
+
+.order-additional-info {
+  border-top: 1px solid var(--grid-color);
+  padding-top: 15px;
 }
 
 .admin-item-customizations {

@@ -24,6 +24,8 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderDetails, setOrderDetails] = useState({});
+  const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
 
   // Filtros para a API
   const [filters, setFilters] = useState({
@@ -71,12 +73,13 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
   const getEstimatedTime = (status) => {
     switch (status) {
       case 'pendente':
+        return 'Aguardando confirmação';
+      case 'recebido':
       case 'em_preparo':
         return '15-20 min';
       case 'pronto':
         return 'Pronto para retirada';
       case 'entregue':
-      case 'finalizado':
         return 'Entregue';
       case 'cancelado':
         return 'Cancelado';
@@ -88,14 +91,14 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
   // Função para mapear status da API para status interno
   const mapApiStatus = (apiStatus) => {
     const statusMap = {
-      'pendente': 'fazendo',
-      'em_preparo': 'fazendo',
-      'pronto': 'completo',
+      'pendente': 'pendente',
+      'recebido': 'recebido',
+      'em_preparo': 'em_preparo',
+      'pronto': 'pronto',
       'entregue': 'entregue',
-      'finalizado': 'entregue',
       'cancelado': 'cancelado'
     };
-    return statusMap[apiStatus] || 'fazendo';
+    return statusMap[apiStatus] || 'pendente';
   };
 
   // Função para formatar pedidos da API para o formato do componente
@@ -114,7 +117,7 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
           id: `#${(order.id || 0).toString().padStart(3, '0')}`,
           date,
           time,
-          items: [], // Será preenchido quando buscarmos os detalhes do pedido
+          items: [],
           total: order.total_final || order.total || 0,
           status: internalStatus,
           estimatedTime: getEstimatedTime(order.status),
@@ -129,7 +132,7 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
           time: '--:--',
           items: [],
           total: 0,
-          status: 'fazendo',
+          status: 'pendente',
           estimatedTime: 'Erro',
           apiData: order
         };
@@ -144,6 +147,58 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
     }
   }, [isLoggedIn, authLoading, filters]);
 
+  // Função para buscar detalhes de um pedido específico
+  const fetchOrderDetails = async (orderId) => {
+    const numericId = parseInt(orderId.replace('#', ''), 10);
+    
+    // Se já temos os detalhes deste pedido, não precisamos buscar novamente
+    if (orderDetails[orderId]) {
+      return orderDetails[orderId];
+    }
+
+    setLoadingOrderDetails(true);
+    try {
+      const details = await orderService.getOrderById(numericId);
+      
+      // Armazenar os detalhes no estado
+      setOrderDetails(prev => ({
+        ...prev,
+        [orderId]: details
+      }));
+      
+      return details;
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do pedido:', error);
+      setError('Erro ao carregar detalhes do pedido. Tente novamente.');
+      return null;
+    } finally {
+      setLoadingOrderDetails(false);
+    }
+  };
+
+  // Função para obter os itens de um pedido (detalhados se disponíveis, senão placeholder)
+  const getOrderItems = (order) => {
+    const details = orderDetails[order.id];
+    
+    if (details && details.itens && details.itens.length > 0) {
+      // Retorna os itens detalhados da API
+      return details.itens.map(item => ({
+        name: item.produto_nome || item.nome || 'Item',
+        quantity: item.quantidade || 1,
+        price: item.preco_unitario || item.preco || 0,
+        total: (item.quantidade || 1) * (item.preco_unitario || item.preco || 0),
+        customizations: item.personalizacoes || [],
+        isPlaceholder: false
+      }));
+    }
+    
+    // Retorna o placeholder padrão
+    return [{
+      name: `${order.apiData?.itens_count || 0} ${order.apiData?.itens_count === 1 ? 'item' : 'itens'}`,
+      isPlaceholder: true
+    }];
+  };
+
   // Função para atualizar filtros
   const updateFilters = (newFilters) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
@@ -151,9 +206,13 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'fazendo':
+      case 'pendente':
+        return 'var(--neon-orange, #ffb347)';
+      case 'recebido':
+        return 'var(--neon-blue, #4fc3f7)';
+      case 'em_preparo':
         return 'var(--neon-yellow)';
-      case 'completo':
+      case 'pronto':
         return 'var(--neon-cyan)';
       case 'entregue':
         return 'var(--neon-green)';
@@ -166,9 +225,13 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'fazendo':
+      case 'pendente':
+        return 'PENDENTE';
+      case 'recebido':
+        return 'RECEBIDO';
+      case 'em_preparo':
         return 'PREPARANDO';
-      case 'completo':
+      case 'pronto':
         return 'PRONTO';
       case 'entregue':
         return 'ENTREGUE';
@@ -181,9 +244,13 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'fazendo':
+      case 'pendente':
+        return '🕓';
+      case 'recebido':
+        return '📨';
+      case 'em_preparo':
         return '⏳';
-      case 'completo':
+      case 'pronto':
         return '✅';
       case 'entregue':
         return '🎉';
@@ -273,7 +340,10 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
                 <div 
                   key={order.id} 
                   className={`order-card ${selectedOrder?.id === order.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedOrder(order)}
+                  onClick={async () => {
+                    setSelectedOrder(order);
+                    await fetchOrderDetails(order.id);
+                  }}
                 >
                   <div className="order-header">
                     <div className="order-id-date">
@@ -287,13 +357,12 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
                   </div>
                   
                   <div className="order-items-preview">
-                    {order.apiData?.itens_count ? (
-                      <span className="item-preview">
-                        {order.apiData.itens_count} {order.apiData.itens_count === 1 ? 'item' : 'itens'}
+                    {getOrderItems(order).map((item, index) => (
+                      <span key={index} className="item-preview">
+                        {item.isPlaceholder ? item.name : `${item.quantity}x ${item.name}`}
+                        {index < getOrderItems(order).length - 1 && ', '}
                       </span>
-                    ) : (
-                      <span className="item-preview">Carregando itens...</span>
-                    )}
+                    ))}
                   </div>
                   
                   <div className="order-footer">
@@ -310,8 +379,10 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
           {selectedOrder && (
             <aside className="order-details">
               <div className="details-content">
-                <h3 className="details-title">DETALHES DO PEDIDO</h3>
-                
+                <div className="details-header">
+                  <h3 className="details-title">DETALHES DO PEDIDO</h3>
+                  <button className="close-details-btn" onClick={() => setSelectedOrder(null)} title="Fechar detalhes">×</button>
+                </div>
                 <div className="order-info">
                   <div className="order-summary">
                     <h4 className="summary-title">Pedido {selectedOrder.id}</h4>
@@ -326,12 +397,44 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
                   </div>
 
                   <div className="order-items-detail">
-                    <h5 className="items-title">Informações do Pedido:</h5>
-                    <div className="order-info-grid">
-                      <div className="info-item">
-                        <span className="info-label">Quantidade de itens:</span>
-                        <span className="info-value">{selectedOrder.apiData?.itens_count || 'N/A'}</span>
+                    <h5 className="items-title">Itens do Pedido:</h5>
+                    {loadingOrderDetails ? (
+                      <div className="loading-items">
+                        <span>🔄 Carregando itens...</span>
                       </div>
+                    ) : (
+                      <div className="items-list">
+                        {getOrderItems(selectedOrder).map((item, index) => (
+                          <div key={index} className="item-detail">
+                            <div className="item-name">
+                              {item.isPlaceholder ? (
+                                `Total de itens: ${selectedOrder.apiData?.itens_count || 'N/A'}`
+                              ) : (
+                                <>
+                                  <span className="item-quantity">{item.quantity}x</span>
+                                  <span className="item-name-text">{item.name}</span>
+                                  <span className="item-price">R$ {item.total.toFixed(2)}</span>
+                                </>
+                              )}
+                            </div>
+                            {!item.isPlaceholder && item.customizations && item.customizations.length > 0 && (
+                              <div className="item-customizations">
+                                <span className="customizations-label">Personalizações:</span>
+                                <div className="customizations-list">
+                                  {item.customizations.map((custom, customIndex) => (
+                                    <span key={customIndex} className="customization-tag">
+                                      {custom}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="order-additional-info">
                       {selectedOrder.apiData?.metodo_pagamento && (
                         <div className="info-item">
                           <span className="info-label">Método de pagamento:</span>
@@ -372,23 +475,28 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
                     </div>
                   </div>
 
-                  {selectedOrder.status === 'fazendo' && (
+                  {/* Etapas de progresso ajustadas para incluir todos os status */}
+                  {(['pendente', 'recebido', 'em_preparo'].includes(selectedOrder.status)) && (
                     <div className="order-progress">
                       <h5 className="progress-title">Acompanhe seu pedido:</h5>
                       <div className="progress-steps">
-                        <div className="step completed">
-                          <div className="step-icon">✓</div>
+                        <div className={`step${['pendente', 'recebido', 'em_preparo', 'pronto', 'entregue'].includes(selectedOrder.status) ? ' completed' : ''}`}>
+                          <div className="step-icon">📋</div>
+                          <div className="step-text">Pedido Enviado</div>
+                        </div>
+                        <div className={`step${['recebido', 'em_preparo', 'pronto', 'entregue'].includes(selectedOrder.status) ? ' completed' : selectedOrder.status === 'pendente' ? '' : ''}`}>
+                          <div className="step-icon">📨</div>
                           <div className="step-text">Pedido Recebido</div>
                         </div>
-                        <div className="step active">
+                        <div className={`step${selectedOrder.status === 'em_preparo' ? ' active' : ['pronto', 'entregue'].includes(selectedOrder.status) ? ' completed' : ''}`}> 
                           <div className="step-icon">⏳</div>
                           <div className="step-text">Preparando</div>
                         </div>
-                        <div className="step">
+                        <div className={`step${selectedOrder.status === 'pronto' ? ' active' : selectedOrder.status === 'entregue' ? ' completed' : ''}`}>
                           <div className="step-icon">🎯</div>
                           <div className="step-text">Pronto</div>
                         </div>
-                        <div className="step">
+                        <div className={`step${selectedOrder.status === 'entregue' ? ' completed' : ''}`}>
                           <div className="step-icon">🎉</div>
                           <div className="step-text">Entregue</div>
                         </div>

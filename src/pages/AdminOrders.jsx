@@ -12,6 +12,8 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
   const [filterStatus, setFilterStatus] = useState('todos');
   const [cancellingOrderId, setCancellingOrderId] = useState(null);
   const [advancingOrderId, setAdvancingOrderId] = useState(null);
+  const [orderDetails, setOrderDetails] = useState({});
+  const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
 
   // Verificação de autenticação e permissão
   useEffect(() => {
@@ -54,8 +56,8 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
         items: [
           {
             name: `${order.itens_count} itens`,
-            customizations: order.observacoes ? [order.observacoes] : [],
-            price: order.total_final || order.total
+            price: order.total_final || order.total,
+            isPlaceholder: true // Indica que este é apenas um placeholder
           }
         ],
         total: order.total_final || order.total,
@@ -80,10 +82,12 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
     switch (apiStatus) {
       case 'pendente':
         return 'pendente';
+      case 'recebido':
+        return 'recebido';
       case 'em_preparo':
-        return 'fazendo';
+        return 'em_preparo';
       case 'pronto':
-        return 'completo';
+        return 'pronto';
       case 'entregue':
         return 'entregue';
       case 'cancelado':
@@ -99,6 +103,55 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
       fetchOrders();
     }
   }, [isLoggedIn, authLoading]);
+
+  // Função para buscar detalhes de um pedido específico
+  const fetchOrderDetails = async (orderId) => {
+    const numericId = parseInt(orderId.replace('#', ''), 10);
+    
+    // Se já temos os detalhes deste pedido, não precisamos buscar novamente
+    if (orderDetails[orderId]) {
+      return orderDetails[orderId];
+    }
+
+    setLoadingOrderDetails(true);
+    try {
+      const details = await orderService.getOrderById(numericId);
+      
+      // Armazenar os detalhes no estado
+      setOrderDetails(prev => ({
+        ...prev,
+        [orderId]: details
+      }));
+      
+      return details;
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do pedido:', error);
+      setError('Erro ao carregar detalhes do pedido. Tente novamente.');
+      return null;
+    } finally {
+      setLoadingOrderDetails(false);
+    }
+  };
+
+  // Função para obter os itens de um pedido (detalhados se disponíveis, senão placeholder)
+  const getOrderItems = (order) => {
+    const details = orderDetails[order.id];
+    
+    if (details && details.itens && details.itens.length > 0) {
+      // Retorna os itens detalhados da API
+      return details.itens.map(item => ({
+        name: item.produto_nome || item.nome || 'Item',
+        quantity: item.quantidade || 1,
+        price: item.preco_unitario || item.preco || 0,
+        total: (item.quantidade || 1) * (item.preco_unitario || item.preco || 0),
+        customizations: item.personalizacoes || [],
+        isPlaceholder: false
+      }));
+    }
+    
+    // Retorna o placeholder padrão
+    return order.items;
+  };
 
   const updateOrderStatus = async (orderId, newStatus) => {
     // Extrair o ID numérico do pedido (remover o # e zeros à esquerda)
@@ -166,10 +219,12 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
   const getNextStatus = (currentStatus) => {
     switch (currentStatus) {
       case 'pendente':
-        return 'fazendo';
-      case 'fazendo':
-        return 'completo';
-      case 'completo':
+        return 'recebido';
+      case 'recebido':
+        return 'em_preparo';
+      case 'em_preparo':
+        return 'pronto';
+      case 'pronto':
         return 'entregue';
       default:
         return null;
@@ -177,20 +232,22 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
   };
 
   const canAdvance = (status) => {
-    return ['pendente', 'fazendo', 'completo'].includes(status);
+    return ['pendente', 'recebido', 'em_preparo', 'pronto'].includes(status);
   };
 
   const canCancel = (status) => {
-    return ['pendente', 'fazendo', 'completo'].includes(status);
+    return ['pendente', 'recebido', 'em_preparo', 'pronto'].includes(status);
   };
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'pendente':
         return 'var(--neon-pink)';
-      case 'fazendo':
+      case 'recebido':
+        return 'var(--neon-blue)';
+      case 'em_preparo':
         return 'var(--neon-yellow)';
-      case 'completo':
+      case 'pronto':
         return 'var(--neon-cyan)';
       case 'entregue':
         return 'var(--neon-green)';
@@ -205,9 +262,11 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
     switch (status) {
       case 'pendente':
         return 'PENDENTE';
-      case 'fazendo':
+      case 'recebido':
+        return 'RECEBIDO';
+      case 'em_preparo':
         return 'PREPARANDO';
-      case 'completo':
+      case 'pronto':
         return 'PRONTO';
       case 'entregue':
         return 'ENTREGUE';
@@ -222,9 +281,11 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
     switch (status) {
       case 'pendente':
         return '📋';
-      case 'fazendo':
+      case 'recebido':
+        return '📨';
+      case 'em_preparo':
         return '⏳';
-      case 'completo':
+      case 'pronto':
         return '✅';
       case 'entregue':
         return '🎉';
@@ -245,8 +306,9 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
     return {
       todos: orders.length,
       pendente: orders.filter(o => o.status === 'pendente').length,
-      fazendo: orders.filter(o => o.status === 'fazendo').length,
-      completo: orders.filter(o => o.status === 'completo').length,
+      recebido: orders.filter(o => o.status === 'recebido').length,
+      em_preparo: orders.filter(o => o.status === 'em_preparo').length,
+      pronto: orders.filter(o => o.status === 'pronto').length,
       entregue: orders.filter(o => o.status === 'entregue').length,
       cancelado: orders.filter(o => o.status === 'cancelado').length
     };
@@ -303,16 +365,22 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
               Pendentes ({orderCounts.pendente})
             </button>
             <button 
-              className={`filter-btn ${filterStatus === 'fazendo' ? 'active' : ''}`}
-              onClick={() => setFilterStatus('fazendo')}
+              className={`filter-btn ${filterStatus === 'recebido' ? 'active' : ''}`}
+              onClick={() => setFilterStatus('recebido')}
             >
-              Preparando ({orderCounts.fazendo})
+              Recebidos ({orderCounts.recebido})
             </button>
             <button 
-              className={`filter-btn ${filterStatus === 'completo' ? 'active' : ''}`}
-              onClick={() => setFilterStatus('completo')}
+              className={`filter-btn ${filterStatus === 'em_preparo' ? 'active' : ''}`}
+              onClick={() => setFilterStatus('em_preparo')}
             >
-              Prontos ({orderCounts.completo})
+              Preparando ({orderCounts.em_preparo})
+            </button>
+            <button 
+              className={`filter-btn ${filterStatus === 'pronto' ? 'active' : ''}`}
+              onClick={() => setFilterStatus('pronto')}
+            >
+              Prontos ({orderCounts.pronto})
             </button>
             <button 
               className={`filter-btn ${filterStatus === 'entregue' ? 'active' : ''}`}
@@ -359,7 +427,10 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
                 <div 
                   key={order.id} 
                   className={`admin-order-card ${selectedOrder?.id === order.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedOrder(order)}
+                  onClick={async () => {
+                    setSelectedOrder(order);
+                    await fetchOrderDetails(order.id);
+                  }}
                 >
                   <div className="admin-order-header">
                     <div className="order-id-customer">
@@ -372,10 +443,10 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
                   <div className="admin-order-time">{order.date} às {order.time}</div>
                   
                   <div className="admin-order-items">
-                    {order.items.map((item, index) => (
+                    {getOrderItems(order).map((item, index) => (
                       <span key={index} className="admin-item-preview">
-                        {item.name}
-                        {index < order.items.length - 1 && ', '}
+                        {item.isPlaceholder ? item.name : `${item.quantity}x ${item.name}`}
+                        {index < getOrderItems(order).length - 1 && ', '}
                       </span>
                     ))}
                   </div>
@@ -412,9 +483,44 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
                   </div>
 
                   <div className="admin-order-items-detail">
-                    <h5 className="admin-items-title">Informações do Pedido:</h5>
-                    <div className="admin-item-detail">
-                      <div className="admin-item-name">Total de itens: {selectedOrder.originalApiData?.itens_count || 'N/A'}</div>
+                    <h5 className="admin-items-title">Itens do Pedido:</h5>
+                    {loadingOrderDetails ? (
+                      <div className="loading-items">
+                        <span>🔄 Carregando itens...</span>
+                      </div>
+                    ) : (
+                      <div className="items-list">
+                        {getOrderItems(selectedOrder).map((item, index) => (
+                          <div key={index} className="admin-item-detail">
+                            <div className="admin-item-name">
+                              {item.isPlaceholder ? (
+                                `Total de itens: ${selectedOrder.originalApiData?.itens_count || 'N/A'}`
+                              ) : (
+                                <>
+                                  <span className="item-quantity">{item.quantity}x</span>
+                                  <span className="item-name">{item.name}</span>
+                                  <span className="item-price">R$ {item.total.toFixed(2)}</span>
+                                </>
+                              )}
+                            </div>
+                            {!item.isPlaceholder && item.customizations && item.customizations.length > 0 && (
+                              <div className="admin-item-customizations">
+                                <span className="admin-customizations-label">Personalizações:</span>
+                                <div className="admin-customizations-list">
+                                  {item.customizations.map((custom, customIndex) => (
+                                    <span key={customIndex} className="admin-customization-tag">
+                                      {custom}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="order-additional-info">
                       {selectedOrder.metodoPagamento && (
                         <div className="admin-item-name">Método de pagamento: {selectedOrder.metodoPagamento}</div>
                       )}
