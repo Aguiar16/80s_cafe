@@ -314,15 +314,13 @@ export const cartService = {
 export const orderService = {
   /**
    * Criar novo pedido
-   * POST /orders/
+   * POST /pedidos
    */
   async createOrder(orderData) {
     return await apiRequest('/pedidos', {
       method: 'POST',
       body: JSON.stringify({
-        metodo_pagamento: orderData.metodoPagamento,
-        tipo_desconto: orderData.tipoDesconto || 'nenhum',
-        observacoes: orderData.observacoes || ''
+        metodo_pagamento: orderData.metodoPagamento || orderData.metodo_pagamento
       }),
     });
   },
@@ -362,14 +360,14 @@ export const orderService = {
     });
   },
 
+
   /**
-   * Processar pagamento de um pedido
-   * POST /api/pedidos/{id}/pagamento
+   * Cancelar um pedido
+   * DELETE /pedidos/{pedido_id}
    */
-  async processPayment(pedidoId, paymentData) {
-    return await apiRequest(`/api/pedidos/${pedidoId}/pagamento`, {
-      method: 'POST',
-      body: JSON.stringify(paymentData),
+  async cancelOrder(pedidoId) {
+    return await apiRequest(`/pedidos/${pedidoId}`, {
+      method: 'DELETE',
     });
   }
 };
@@ -379,23 +377,24 @@ export const orderService = {
 // ======================================
 
 export const kitchenService = {
+
   /**
-   * Obter pedidos pendentes na cozinha
-   * GET /kitchen/orders
+   * Obter pedidos da cozinha 
+   * GET /pedidos/admin/
    */
-  async getPendingOrders() {
-    return await apiRequest('/kitchen/orders', {
+  async getKitchenOrders() {
+    return await apiRequest('/pedidos/cozinha/todos', {
       method: 'GET',
     });
   },
 
   /**
    * Avançar status de um pedido
-   * PUT /kitchen/orders/{id}/advance
+   * POST /pedidos/{pedido_id}/avancar-estado
    */
   async advanceOrderStatus(orderId) {
-    return await apiRequest(`/kitchen/orders/${orderId}/advance`, {
-      method: 'PUT',
+    return await apiRequest(`/pedidos/${orderId}/avancar-estado`, {
+      method: 'POST',
     });
   },
 

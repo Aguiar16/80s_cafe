@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import './AdminOrders.css';
 import { useAuth } from '../hooks/useAuth';
-import { authService } from '../services/api';
+import { authService, kitchenService, orderService } from '../services/api';
 
 const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
   const { isLoggedIn, loading: authLoading } = useAuth();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [filterStatus, setFilterStatus] = useState('todos');
+  const [cancellingOrderId, setCancellingOrderId] = useState(null);
+  const [advancingOrderId, setAdvancingOrderId] = useState(null);
 
   // Verificação de autenticação e permissão
   useEffect(() => {
@@ -25,107 +32,131 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
     }
   }, [isLoggedIn, authLoading, onNavigateToLogin, onNavigateToHome]);
 
-  // Mock data - substituir por API no futuro
-  // Função para obter pedidos (mock, substituir por API futuramente)
-  const getInitialOrders = () => ([
-    {
-      id: '#001',
-      customerName: 'João Silva',
-      date: '2025-07-16',
-      time: '14:30',
-      items: [
-        {
-          name: 'DeLorean Express',
-          customizations: ['Leite de Amêndoa', 'Sem Açúcar', 'Canela'],
-          price: 14.50
-        }
-      ],
-      total: 14.50,
-      status: 'fazendo'
-    },
-    {
-      id: '#002',
-      customerName: 'Maria Santos',
-      date: '2025-07-16',
-      time: '14:45',
-      items: [
-        {
-          name: 'Chá de Neon',
-          customizations: ['Mel', 'Limão'],
-          price: 9.50
-        },
-        {
-          name: 'Sonho de Verão',
-          customizations: ['Chantilly'],
-          price: 12.50
-        }
-      ],
-      total: 22.00,
-      status: 'pendente'
-    },
-    {
-      id: '#003',
-      customerName: 'Pedro Costa',
-      date: '2025-07-16',
-      time: '15:00',
-      items: [
-        {
-          name: 'DeLorean Express',
-          customizations: ['Dose Extra'],
-          price: 15.00
-        }
-      ],
-      total: 15.00,
-      status: 'completo'
-    },
-    {
-      id: '#004',
-      customerName: 'Ana Oliveira',
-      date: '2025-07-16',
-      time: '15:15',
-      items: [
-        {
-          name: 'Sonho de Verão',
-          customizations: ['Marshmallows', 'Chocolate 70%'],
-          price: 15.80
-        }
-      ],
-      total: 15.80,
-      status: 'entregue'
-    },
-    {
-      id: '#005',
-      customerName: 'Carlos Lima',
-      date: '2025-07-16',
-      time: '15:30',
-      items: [
-        {
-          name: 'DeLorean Express',
-          customizations: ['Leite Integral'],
-          price: 12.00
-        }
-      ],
-      total: 12.00,
-      status: 'cancelado'
+
+
+  // Função para buscar pedidos da API
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await kitchenService.getKitchenOrders();
+      
+      // Transformar dados da API para o formato esperado pelo componente
+      const transformedOrders = response.map(order => ({
+        id: `#${order.id.toString().padStart(3, '0')}`,
+        customerName: order.cliente_nome,
+        date: new Date(order.data_pedido).toLocaleDateString('pt-BR'),
+        time: new Date(order.data_pedido).toLocaleTimeString('pt-BR', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+        items: [
+          {
+            name: `${order.itens_count} itens`,
+            customizations: order.observacoes ? [order.observacoes] : [],
+            price: order.total_final || order.total
+          }
+        ],
+        total: order.total_final || order.total,
+        status: mapApiStatusToLocalStatus(order.status),
+        originalApiData: order,
+        metodoPagamento: order.metodo_pagamento,
+        desconto: order.desconto,
+        observacoes: order.observacoes
+      }));
+      
+      setOrders(transformedOrders);
+    } catch (err) {
+      console.error('Erro ao buscar pedidos:', err);
+      setError('Erro ao carregar pedidos. Verifique sua conexão e tente novamente.');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
-  const [orders, setOrders] = useState(getInitialOrders());
+  // Função para mapear status da API para status local
+  const mapApiStatusToLocalStatus = (apiStatus) => {
+    switch (apiStatus) {
+      case 'pendente':
+        return 'pendente';
+      case 'em_preparo':
+        return 'fazendo';
+      case 'pronto':
+        return 'completo';
+      case 'entregue':
+        return 'entregue';
+      case 'cancelado':
+        return 'cancelado';
+      default:
+        return 'pendente';
+    }
+  };
 
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('todos');
+  // Carregar pedidos quando o componente monta e a autenticação está carregada
+  useEffect(() => {
+    if (!authLoading && isLoggedIn && authService.isStaff()) {
+      fetchOrders();
+    }
+  }, [isLoggedIn, authLoading]);
 
-  const updateOrderStatus = (orderId, newStatus) => {
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: newStatus }
-          : order
-      )
-    );
+  const updateOrderStatus = async (orderId, newStatus) => {
+    // Extrair o ID numérico do pedido (remover o # e zeros à esquerda)
+    const numericId = parseInt(orderId.replace('#', ''), 10);
+    
+    // Se for cancelamento, usar a API DELETE
+    if (newStatus === 'cancelado') {
+      setCancellingOrderId(orderId);
+      try {
+        // Chamar a API para cancelar o pedido
+        await orderService.cancelOrder(numericId);
+        
+        // Atualizar o estado local após sucesso da API
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order.id === orderId 
+              ? { ...order, status: newStatus }
+              : order
+          )
+        );
 
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+        if (selectedOrder?.id === orderId) {
+          setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+        }
+        
+        // Recarregar os pedidos para sincronizar com o servidor
+        await fetchOrders();
+        
+      } catch (error) {
+        console.error('Erro ao cancelar pedido:', error);
+        setError('Erro ao cancelar pedido. Tente novamente.');
+      } finally {
+        setCancellingOrderId(null);
+      }
+    } else {
+      // Para avançar status, usar a API POST /pedidos/{pedido_id}/avancar-estado
+      setAdvancingOrderId(orderId);
+      try {
+        // Chamar a API para avançar o estado do pedido
+        await orderService.advanceOrderStatus(numericId);
+        
+        // Recarregar os pedidos para sincronizar com o servidor
+        await fetchOrders();
+        
+        // Atualizar o pedido selecionado se for o mesmo que foi alterado
+        if (selectedOrder?.id === orderId) {
+          const updatedOrder = orders.find(order => order.id === orderId);
+          if (updatedOrder) {
+            setSelectedOrder({ ...updatedOrder, status: newStatus });
+          }
+        }
+        
+      } catch (error) {
+        console.error('Erro ao avançar status do pedido:', error);
+        setError('Erro ao avançar status do pedido. Tente novamente.');
+      } finally {
+        setAdvancingOrderId(null);
+      }
     }
   };
 
@@ -244,8 +275,8 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
               <span className="stat-label">Total:</span>
               <span className="stat-value">{orderCounts.todos}</span>
             </span>
-            <button className="reload-btn" onClick={() => setOrders(getInitialOrders())} title="Recarregar pedidos">
-              <span className="reload-icon">🔄</span> RECARREGAR
+            <button className="reload-btn" onClick={fetchOrders} title="Recarregar pedidos" disabled={loading}>
+              <span className="reload-icon">🔄</span> {loading ? 'CARREGANDO...' : 'RECARREGAR'}
             </button>
           </div>
         </div>
@@ -299,8 +330,27 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
       {/* Main Content */}
       <main className="admin-main">
         <div className="admin-content">
+          {/* Loading e Error States */}
+          {loading && (
+            <div className="admin-loading">
+              <div className="loading-spinner">🔄</div>
+              <p>Carregando pedidos...</p>
+            </div>
+          )}
+          
+          {error && !loading && (
+            <div className="admin-error">
+              <div className="error-icon">⚠️</div>
+              <p>{error}</p>
+              <button className="retry-btn" onClick={fetchOrders}>
+                Tentar Novamente
+              </button>
+            </div>
+          )}
+
           {/* Orders List */}
-          <section className="admin-orders-section">
+          {!loading && !error && (
+            <section className="admin-orders-section">
             <div className="orders-grid">
               {filteredOrders.map(order => (
                 <div 
@@ -338,6 +388,7 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
               ))}
             </div>
           </section>
+          )}
 
           {/* Order Management Panel */}
           {selectedOrder && (
@@ -358,28 +409,41 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
                   </div>
 
                   <div className="admin-order-items-detail">
-                    <h5 className="admin-items-title">Itens do Pedido:</h5>
-                    {selectedOrder.items.map((item, index) => (
-                      <div key={index} className="admin-item-detail">
-                        <div className="admin-item-name">{item.name}</div>
-                        {item.customizations.length > 0 && (
-                          <div className="admin-item-customizations">
-                            <span className="admin-customizations-label">Personalizações:</span>
-                            <div className="admin-customizations-list">
-                              {item.customizations.map((customization, idx) => (
-                                <span key={idx} className="admin-customization-tag">
-                                  {customization}
-                                </span>
-                              ))}
-                            </div>
+                    <h5 className="admin-items-title">Informações do Pedido:</h5>
+                    <div className="admin-item-detail">
+                      <div className="admin-item-name">Total de itens: {selectedOrder.originalApiData?.itens_count || 'N/A'}</div>
+                      {selectedOrder.metodoPagamento && (
+                        <div className="admin-item-name">Método de pagamento: {selectedOrder.metodoPagamento}</div>
+                      )}
+                      {selectedOrder.desconto > 0 && (
+                        <div className="admin-item-name">Desconto: R$ {selectedOrder.desconto.toFixed(2)}</div>
+                      )}
+                      {selectedOrder.observacoes && (
+                        <div className="admin-item-customizations">
+                          <span className="admin-customizations-label">Observações:</span>
+                          <div className="admin-customizations-list">
+                            <span className="admin-customization-tag">
+                              {selectedOrder.observacoes}
+                            </span>
                           </div>
-                        )}
-                        <div className="admin-item-price">R$ {item.price.toFixed(2)}</div>
-                      </div>
-                    ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="admin-order-total-detail">
+                    {selectedOrder.desconto > 0 && (
+                      <div className="admin-total-line">
+                        <span className="admin-total-label">SUBTOTAL:</span>
+                        <span className="admin-total-value">R$ {(selectedOrder.originalApiData?.total || selectedOrder.total).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {selectedOrder.desconto > 0 && (
+                      <div className="admin-total-line">
+                        <span className="admin-total-label">DESCONTO:</span>
+                        <span className="admin-total-value" style={{ color: 'var(--neon-green)' }}>- R$ {selectedOrder.desconto.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="admin-total-line">
                       <span className="admin-total-label">TOTAL:</span>
                       <span className="admin-total-value">R$ {selectedOrder.total.toFixed(2)}</span>
@@ -393,16 +457,18 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
                         <button 
                           className="status-btn advance"
                           onClick={() => updateOrderStatus(selectedOrder.id, getNextStatus(selectedOrder.status))}
+                          disabled={advancingOrderId === selectedOrder.id}
                         >
-                          ➡️ Avançar para {getStatusText(getNextStatus(selectedOrder.status))}
+                          {advancingOrderId === selectedOrder.id ? '⏳ Avançando...' : `➡️ Avançar para ${getStatusText(getNextStatus(selectedOrder.status))}`}
                         </button>
                       )}
                       {canCancel(selectedOrder.status) && (
                         <button 
                           className="status-btn cancel"
                           onClick={() => updateOrderStatus(selectedOrder.id, 'cancelado')}
+                          disabled={cancellingOrderId === selectedOrder.id}
                         >
-                          ❌ Cancelar Pedido
+                          {cancellingOrderId === selectedOrder.id ? '⏳ Cancelando...' : '❌ Cancelar Pedido'}
                         </button>
                       )}
                       {selectedOrder.status === 'entregue' && (

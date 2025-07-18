@@ -32,6 +32,7 @@ const App = () => {
         return <Login 
           onNavigateToHome={() => navigateTo('home')} 
           onNavigateToMenu={() => navigateTo('menu')}
+          onNavigateToAdmin={() => navigateTo('admin-orders')}
         />;
       case 'menu':
         return <Menu 

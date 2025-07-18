@@ -74,33 +74,26 @@ const Payment = ({ orderData, onNavigateToHome, onNavigateBack, onNavigateToLogi
 
     // Mapear método de pagamento para o formato da API
     let metodoPagamento;
-    let tipoDesconto;
-
     switch (selectedPaymentMethod.id) {
       case 'pix':
-        metodoPagamento = 'PIX';
-        tipoDesconto = 'PIX';
+        metodoPagamento = 'pix';
+        
         break;
       case 'fidelidade':
-        metodoPagamento = 'FIDELIDADE';
-        tipoDesconto = 'FIDELIDADE';
+        metodoPagamento = 'fidelidade';
+        
         break;
       case 'debito':
-        metodoPagamento = 'CARTÃO';
-        tipoDesconto = 'NENHUM';
+        metodoPagamento = 'cartao';
         break;
       default:
-        metodoPagamento = 'CARTÃO';
-        tipoDesconto = 'NENHUM';
+        metodoPagamento = 'cartao';
+
     }
 
     // Monta corpo do pedido
     const orderBody = {
-      metodo_pagamento: metodoPagamento,
-      tipo_desconto: tipoDesconto,
-      observacoes: currentOrder.items && currentOrder.items.length > 0
-        ? currentOrder.items.map(i => i.observacoes).filter(Boolean).join('; ')
-        : ''
+      metodo_pagamento: metodoPagamento
     };
 
     try {

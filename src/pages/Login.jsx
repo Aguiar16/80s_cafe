@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { authService, apiUtils } from '../services/api';
 import './Login.css';
 
-const Login = ({ onNavigateToHome, onNavigateToMenu }) => {
+const Login = ({ onNavigateToHome, onNavigateToMenu, onNavigateToAdmin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
@@ -166,18 +166,29 @@ const Login = ({ onNavigateToHome, onNavigateToMenu }) => {
       
       // Redirecionar para o menu após sucesso
       setTimeout(() => {
-        console.log('Redirecionando para o menu...');
-        // Verificar se há função de navegação para menu
-        if (onNavigateToMenu) {
-          onNavigateToMenu();
-        } else if (onNavigateToHome) {
-          // Fallback para home se não tiver navegação direta para menu
-          console.log('Navegação para menu não disponível, indo para home');
-          onNavigateToHome();
+        console.log('Redirecionando após login...');
+        
+        // Verificar tipo de usuário para direcionar adequadamente
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const isStaffUser = currentUser.tipo_usuario === 'staff' || currentUser.is_staff === true;
+        
+        if (isStaffUser) {
+          // Usuário é admin/staff - redirecionar para área administrativa
+          console.log('Usuário é admin/staff, redirecionando para área administrativa');
+          if (onNavigateToAdmin) {
+            onNavigateToAdmin();
+          } else {
+            console.log('Navegação para admin não disponível');
+            if (onNavigateToHome) {
+              onNavigateToHome();
+            }
+          }
         } else {
-          // Último fallback para redirecionamento direto
-          console.log('Nenhuma função de navegação disponível, usando window.location');
-          window.location.href = '/menu';
+          // Usuário é cliente - redirecionar para menu
+          console.log('Usuário é cliente, redirecionando para menu');
+          if (onNavigateToMenu) {
+            onNavigateToMenu();
+          }
         }
       }, 1500);
 

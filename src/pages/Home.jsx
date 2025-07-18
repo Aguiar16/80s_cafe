@@ -66,18 +66,19 @@ const Home = ({ onNavigateToLogin, onNavigateToMenu, onNavigateToOrders, onNavig
             <span className="logo-subtitle">EST. 1985</span>
           </div>
           <nav className="nav">
-            <button className="nav-btn" onClick={scrollToMenu}>MENU</button>
-            <button className="nav-btn" onClick={handleOrdersClick}>PEDIDOS</button>
-            <button className="nav-btn" onClick={handleAdminClick}>ADMIN</button>
-            
-            {/* Botão de login/logout dinâmico */}
+            {isLoggedIn && !isStaff && (
+              <>
+                <button className="nav-btn" onClick={scrollToMenu}>MENU</button>
+                <button className="nav-btn" onClick={handleOrdersClick}>PEDIDOS</button>
+              </>
+            )}
             {loading ? (
               <div className="auth-loading">
                 <span>⏳</span>
               </div>
             ) : isLoggedIn ? (
               <div className="user-menu">
-                <button className="user-btn" onClick={handleUserProfileClick}>
+                <button className="user-btn" onClick={isStaff ? handleAdminClick : handleUserProfileClick}>
                   <span className="user-icon">👤</span>
                   <span className="user-name">
                     {user?.nome ? user.nome.split(' ')[0] : 'Usuário'}
@@ -139,11 +140,19 @@ const Home = ({ onNavigateToLogin, onNavigateToMenu, onNavigateToOrders, onNavig
           </p>
 
           <div className="hero-buttons">
-            <button className="btn btn-primary" onClick={scrollToMenu}>
+            <button 
+              className="btn btn-primary" 
+              onClick={isStaff ? undefined : scrollToMenu} 
+              disabled={isStaff}
+            >
               <span className="btn-text">EXPLORAR MENU</span>
               <span className="btn-glow"></span>
             </button>
-            <button className="btn btn-secondary" onClick={handleOrdersClick}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={isStaff ? undefined : handleOrdersClick} 
+              disabled={isStaff}
+            >
               <span className="btn-text">FAZER PEDIDO</span>
               <span className="btn-glow"></span>
             </button>
@@ -237,10 +246,6 @@ const Home = ({ onNavigateToLogin, onNavigateToMenu, onNavigateToOrders, onNavig
           <p className="cta-subtitle">
             Junte-se à revolução do café e experimente sabores que vão além do imaginável.
           </p>
-          <button className="btn btn-mega">
-            <span className="btn-text">COMEÇAR AGORA</span>
-            <span className="btn-glow"></span>
-          </button>
         </div>
       </section>
 
