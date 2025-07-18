@@ -121,7 +121,18 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
           total: order.total_final || order.total || 0,
           status: internalStatus,
           estimatedTime: getEstimatedTime(order.status),
-          apiData: order // Manter dados originais da API para referência
+          apiData: order, // Manter dados originais da API para referência
+          // Armazenar os itens detalhados diretamente se disponíveis
+          detailedItems: order.itens ? order.itens.map(item => ({
+            name: item.item,
+            price: item.preco,
+            quantity: 1, // Quantidade já incluída no nome do item
+            total: item.preco,
+            isPlaceholder: false
+          })) : null,
+          metodoPagamento: order.metodo_pagamento,
+          desconto: order.desconto || 0,
+          observacoes: order.observacoes
         };
       } catch (error) {
         console.error('Erro ao formatar pedido:', error, order);
@@ -134,7 +145,8 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
           total: 0,
           status: 'pendente',
           estimatedTime: 'Erro',
-          apiData: order
+          apiData: order,
+          detailedItems: null
         };
       }
     });
@@ -154,6 +166,30 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
     // Se já temos os detalhes deste pedido, não precisamos buscar novamente
     if (orderDetails[orderId]) {
       return orderDetails[orderId];
+    }
+
+    // Verifica se o pedido já tem itens detalhados carregados
+    const order = orders.find(o => o.id === orderId);
+    if (order && order.detailedItems && order.detailedItems.length > 0) {
+      // Se já temos os itens detalhados, não precisa fazer nova requisição
+      const mockDetails = {
+        itens: order.detailedItems.map(item => ({
+          item: item.name,
+          preco: item.price,
+          quantidade: item.quantity,
+          preco_unitario: item.price,
+          produto_nome: item.name,
+          nome: item.name,
+          total: item.total
+        }))
+      };
+      
+      setOrderDetails(prev => ({
+        ...prev,
+        [orderId]: mockDetails
+      }));
+      
+      return mockDetails;
     }
 
     setLoadingOrderDetails(true);
@@ -178,21 +214,26 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
 
   // Função para obter os itens de um pedido (detalhados se disponíveis, senão placeholder)
   const getOrderItems = (order) => {
-    const details = orderDetails[order.id];
+    // Primeiro, verifica se temos itens detalhados nos dados transformados
+    if (order.detailedItems && order.detailedItems.length > 0) {
+      return order.detailedItems;
+    }
     
+    // Segundo, verifica se temos detalhes carregados separadamente via fetchOrderDetails
+    const details = orderDetails[order.id];
     if (details && details.itens && details.itens.length > 0) {
       // Retorna os itens detalhados da API
       return details.itens.map(item => ({
-        name: item.produto_nome || item.nome || 'Item',
+        name: item.produto_nome || item.nome || item.item || 'Item',
         quantity: item.quantidade || 1,
         price: item.preco_unitario || item.preco || 0,
-        total: (item.quantidade || 1) * (item.preco_unitario || item.preco || 0),
+        total: item.total || ((item.quantidade || 1) * (item.preco_unitario || item.preco || 0)),
         customizations: item.personalizacoes || [],
         isPlaceholder: false
       }));
     }
     
-    // Retorna o placeholder padrão
+    // Por último, retorna o placeholder padrão
     return [{
       name: `${order.apiData?.itens_count || 0} ${order.apiData?.itens_count === 1 ? 'item' : 'itens'}`,
       isPlaceholder: true
@@ -417,56 +458,44 @@ const CustomerOrders = ({ onNavigateToHome, onNavigateToMenu, onNavigateToLogin 
                                 </>
                               )}
                             </div>
-                            {!item.isPlaceholder && item.customizations && item.customizations.length > 0 && (
-                              <div className="item-customizations">
-                                <span className="customizations-label">Personalizações:</span>
-                                <div className="customizations-list">
-                                  {item.customizations.map((custom, customIndex) => (
-                                    <span key={customIndex} className="customization-tag">
-                                      {custom}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
                     )}
                     
                     <div className="order-additional-info">
-                      {selectedOrder.apiData?.metodo_pagamento && (
+                      {(selectedOrder.metodoPagamento || selectedOrder.apiData?.metodo_pagamento) && (
                         <div className="info-item">
                           <span className="info-label">Método de pagamento:</span>
-                          <span className="info-value">{selectedOrder.apiData.metodo_pagamento}</span>
+                          <span className="info-value">{selectedOrder.metodoPagamento || selectedOrder.apiData.metodo_pagamento}</span>
                         </div>
                       )}
-                      {selectedOrder.apiData?.tipo_desconto && selectedOrder.apiData.tipo_desconto !== 'nenhum' && (
+                      {(selectedOrder.desconto > 0 || selectedOrder.apiData?.desconto > 0) && (
                         <div className="info-item">
                           <span className="info-label">Desconto:</span>
-                          <span className="info-value">{selectedOrder.apiData.tipo_desconto}</span>
+                          <span className="info-value">R$ {(selectedOrder.desconto || selectedOrder.apiData?.desconto || 0).toFixed(2)}</span>
                         </div>
                       )}
-                      {selectedOrder.apiData?.observacoes && (
+                      {(selectedOrder.observacoes || selectedOrder.apiData?.observacoes) && (
                         <div className="info-item">
                           <span className="info-label">Observações:</span>
-                          <span className="info-value">{selectedOrder.apiData.observacoes}</span>
+                          <span className="info-value">{selectedOrder.observacoes || selectedOrder.apiData.observacoes}</span>
                         </div>
                       )}
                     </div>
                   </div>
 
                   <div className="order-total-detail">
-                    {selectedOrder.apiData?.desconto > 0 && (
+                    {(selectedOrder.desconto > 0 || selectedOrder.apiData?.desconto > 0) && (
                       <div className="total-line subtotal">
                         <span className="total-label">Subtotal:</span>
-                        <span className="total-value">R$ {selectedOrder.apiData.total.toFixed(2)}</span>
+                        <span className="total-value">R$ {(selectedOrder.apiData?.total || selectedOrder.total).toFixed(2)}</span>
                       </div>
                     )}
-                    {selectedOrder.apiData?.desconto > 0 && (
+                    {(selectedOrder.desconto > 0 || selectedOrder.apiData?.desconto > 0) && (
                       <div className="total-line discount">
                         <span className="total-label">Desconto:</span>
-                        <span className="total-value">- R$ {selectedOrder.apiData.desconto.toFixed(2)}</span>
+                        <span className="total-value">- R$ {(selectedOrder.desconto || selectedOrder.apiData?.desconto || 0).toFixed(2)}</span>
                       </div>
                     )}
                     <div className="total-line">

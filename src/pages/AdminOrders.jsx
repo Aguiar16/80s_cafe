@@ -64,8 +64,14 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
         status: mapApiStatusToLocalStatus(order.status),
         originalApiData: order,
         metodoPagamento: order.metodo_pagamento,
-        desconto: order.desconto,
-        observacoes: order.observacoes
+        desconto: order.desconto || 0,
+        observacoes: order.observacoes,
+        // Armazenar os itens detalhados diretamente se disponíveis
+        detailedItems: order.itens ? order.itens.map(item => ({
+          name: item.item,
+          price: item.preco,
+          isPlaceholder: false
+        })) : null
       }));
       
       setOrders(transformedOrders);
@@ -113,6 +119,25 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
       return orderDetails[orderId];
     }
 
+    // Verifica se o pedido já tem itens detalhados carregados
+    const order = orders.find(o => o.id === orderId);
+    if (order && order.detailedItems && order.detailedItems.length > 0) {
+      // Se já temos os itens detalhados, não precisa fazer nova requisição
+      const mockDetails = {
+        itens: order.detailedItems.map(item => ({
+          item: item.name,
+          preco: item.price
+        }))
+      };
+      
+      setOrderDetails(prev => ({
+        ...prev,
+        [orderId]: mockDetails
+      }));
+      
+      return mockDetails;
+    }
+
     setLoadingOrderDetails(true);
     try {
       const details = await orderService.getOrderById(numericId);
@@ -135,21 +160,23 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
 
   // Função para obter os itens de um pedido (detalhados se disponíveis, senão placeholder)
   const getOrderItems = (order) => {
-    const details = orderDetails[order.id];
+    // Primeiro, verifica se temos itens detalhados nos dados transformados
+    if (order.detailedItems && order.detailedItems.length > 0) {
+      return order.detailedItems;
+    }
     
+    // Segundo, verifica se temos detalhes carregados separadamente via fetchOrderDetails
+    const details = orderDetails[order.id];
     if (details && details.itens && details.itens.length > 0) {
-      // Retorna os itens detalhados da API
+      console.log('Detalhes dos itens da API:', details.itens);
       return details.itens.map(item => ({
-        name: item.produto_nome || item.nome || 'Item',
-        quantity: item.quantidade || 1,
-        price: item.preco_unitario || item.preco || 0,
-        total: (item.quantidade || 1) * (item.preco_unitario || item.preco || 0),
-        customizations: item.personalizacoes || [],
+        name: item.item,
+        price: item.preco,
         isPlaceholder: false
       }));
     }
     
-    // Retorna o placeholder padrão
+    // Por último, retorna o placeholder padrão
     return order.items;
   };
 
@@ -445,7 +472,7 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
                   <div className="admin-order-items">
                     {getOrderItems(order).map((item, index) => (
                       <span key={index} className="admin-item-preview">
-                        {item.isPlaceholder ? item.name : `${item.quantity}x ${item.name}`}
+                        {item.isPlaceholder ? item.name : item.name}
                         {index < getOrderItems(order).length - 1 && ', '}
                       </span>
                     ))}
@@ -497,24 +524,11 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
                                 `Total de itens: ${selectedOrder.originalApiData?.itens_count || 'N/A'}`
                               ) : (
                                 <>
-                                  <span className="item-quantity">{item.quantity}x</span>
                                   <span className="item-name">{item.name}</span>
-                                  <span className="item-price">R$ {item.total.toFixed(2)}</span>
+                                  <span className="item-price">R$ {(item.price || 0).toFixed(2)}</span>
                                 </>
                               )}
                             </div>
-                            {!item.isPlaceholder && item.customizations && item.customizations.length > 0 && (
-                              <div className="admin-item-customizations">
-                                <span className="admin-customizations-label">Personalizações:</span>
-                                <div className="admin-customizations-list">
-                                  {item.customizations.map((custom, customIndex) => (
-                                    <span key={customIndex} className="admin-customization-tag">
-                                      {custom}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
