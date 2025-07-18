@@ -205,6 +205,13 @@ const Menu = ({ onNavigateToHome, onNavigateToCart, onNavigateToLogin }) => {
     }
   };
 
+  const handleCloseDetails = () => {
+    setSelectedDrink(null);
+    setSelectedCustomizations([]);
+    setCalculatedPrice(0);
+    setObservations('');
+  };
+
   return (
     <div className="menu-container">
       {/* Header */}
@@ -287,9 +294,18 @@ const Menu = ({ onNavigateToHome, onNavigateToCart, onNavigateToLogin }) => {
 
           {/* Side Panel - Drink Details */}
           {selectedDrink && !loading && !error && (
-            <aside className="drink-details">
-              <div className="details-content">
-                <h3 className="details-title">DETALHES</h3>
+            <>
+              {/* Modal Overlay */}
+              <div className="modal-overlay" onClick={handleCloseDetails}></div>
+              
+              <aside className="drink-details">
+                <div className="details-content">
+                  <h3 className="details-title">
+                    DETALHES
+                    <button className="close-btn" onClick={handleCloseDetails}>
+                      ×
+                    </button>
+                  </h3>
                 <div className="selected-drink">
                   <div className="selected-drink-icon">{selectedDrink.icon}</div>
                   <h4 className="selected-drink-name">{selectedDrink.name}</h4>
@@ -349,6 +365,7 @@ const Menu = ({ onNavigateToHome, onNavigateToCart, onNavigateToLogin }) => {
                 </div>
               </div>
             </aside>
+            </>
           )}
         </div>
       </main>

@@ -380,10 +380,26 @@ export const kitchenService = {
 
   /**
    * Obter pedidos da cozinha 
-   * GET /pedidos/admin/
+   * GET /pedidos/cozinha/todos
    */
-  async getKitchenOrders() {
-    return await apiRequest('/pedidos/cozinha/todos', {
+  async getKitchenOrders(filters = {}) {
+    const params = new URLSearchParams();
+    
+    if (filters.status) {
+      params.append('status', filters.status);
+    }
+    if (filters.skip !== undefined) {
+      params.append('skip', filters.skip);
+    }
+    
+    // Definir limit padrão como 200 se não especificado
+    const limit = filters.limit !== undefined ? filters.limit : 200;
+    params.append('limit', limit);
+
+    const queryString = params.toString();
+    const endpoint = queryString ? `/pedidos/cozinha/todos?${queryString}` : '/pedidos/cozinha/todos';
+    
+    return await apiRequest(endpoint, {
       method: 'GET',
     });
   },
@@ -393,20 +409,15 @@ export const kitchenService = {
    * POST /pedidos/{pedido_id}/avancar-estado
    */
   async advanceOrderStatus(orderId) {
+    console.log('Chamando advanceOrderStatus com orderId:', orderId);
+    console.log('URL completa:', `${API_BASE_URL}/pedidos/${orderId}/avancar-estado`);
+    
     return await apiRequest(`/pedidos/${orderId}/avancar-estado`, {
       method: 'POST',
+      body: JSON.stringify({})
     });
   },
 
-  /**
-   * Obter estatísticas da cozinha
-   * GET /kitchen/statistics
-   */
-  async getStatistics() {
-    return await apiRequest('/kitchen/statistics', {
-      method: 'GET',
-    });
-  }
 };
 
 // ======================================

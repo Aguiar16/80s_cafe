@@ -137,8 +137,11 @@ const AdminOrders = ({ onNavigateToHome, onNavigateToLogin }) => {
       // Para avançar status, usar a API POST /pedidos/{pedido_id}/avancar-estado
       setAdvancingOrderId(orderId);
       try {
+        // Log para debug
+        console.log('Avançando status do pedido:', { orderId, numericId, newStatus });
+        
         // Chamar a API para avançar o estado do pedido
-        await orderService.advanceOrderStatus(numericId);
+        await kitchenService.advanceOrderStatus(numericId);
         
         // Recarregar os pedidos para sincronizar com o servidor
         await fetchOrders();
